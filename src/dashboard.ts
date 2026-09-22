@@ -19,6 +19,10 @@ export type Value = { feed: string; from_dev: string; to_dev: string; num: numbe
 export type DashboardView = {
 	feeds: Feed[];
 	values: Value[];
+	/** Server time in unix seconds, straight out of the read answer. */
+	clock: number;
+	/** Its UTC offset in minutes — the mini has no other way to learn either. */
+	zone: number;
 };
 
 /** `R-…`, `W-…` or `R-…:W-…` — anything else is a slug. */
@@ -28,6 +32,18 @@ function readTokenOf(ref: string): string {
 		if (/^R-/i.test(p)) return p;
 	}
 	return '';
+}
+
+/**
+ * Does this reference let us WRITE?
+ *
+ * The panel asks before it offers to send, not after it fails: a slug is
+ * resolvable only by campus (its relay route authorises by session), so with a
+ * slug there is nothing the panel could do on its own and the honest thing is
+ * to say so rather than to show a switch that does nothing.
+ */
+export function canWrite(ref: string): boolean {
+	return ref.split(':').some((part) => /^W-/i.test(part.trim()));
 }
 
 function base(server: string): string {
@@ -53,14 +69,21 @@ function base(server: string): string {
  * That also means a feed nobody has written yet does not appear, which is
  * honest: it does not exist on the dashboard either.
  */
-export async function readValues(server: string, ref: string): Promise<DashboardView | null> {
+export async function readValues(
+	server: string,
+	ref: string,
+	scope = 'dashboard'
+): Promise<DashboardView | null> {
 	const api = base(server);
 	const token = readTokenOf(ref) || ref.trim();
 	if (!api || !token) return null;
 
 	let payload: any;
 	try {
-		const res = await fetch(`${api}/read?t=${encodeURIComponent(token)}`);
+		// The scope is the PROGRAM's question, not ours — see SimxAnnouncement.
+		const res = await fetch(
+			`${api}/read?t=${encodeURIComponent(token)}&scope=${encodeURIComponent(scope)}`
+		);
 		if (!res.ok) return null;
 		payload = await res.json();
 	} catch {
@@ -68,6 +91,8 @@ export async function readValues(server: string, ref: string): Promise<Dashboard
 	}
 
 	const rows: any[] = Array.isArray(payload?.w) ? payload.w : [];
+	const clock = Number(payload?.ts) || 0;
+	const zone = Number(payload?.tzo) || 0;
 	const feeds = new Map<string, Feed>();
 	const values: Value[] = [];
 	for (const row of rows) {
@@ -85,7 +110,7 @@ export async function readValues(server: string, ref: string): Promise<Dashboard
 			ts: new Date().toISOString()
 		});
 	}
-	return { feeds: [...feeds.values()], values };
+	return { feeds: [...feeds.values()], values, clock, zone };
 }
 
 /**
@@ -100,6 +125,7 @@ export async function readValues(server: string, ref: string): Promise<Dashboard
 export function watchValues(
 	server: string,
 	ref: string,
+	scope: string,
 	onView: (view: DashboardView) => void
 ): () => void {
 	let stopped = false;
@@ -107,7 +133,7 @@ export function watchValues(
 
 	const tick = async () => {
 		if (stopped) return;
-		const view = await readValues(server, ref);
+		const view = await readValues(server, ref, scope);
 		if (stopped) return;
 		if (view) onView(view);
 		timer = setTimeout(tick, 2000);
@@ -118,4 +144,59 @@ export function watchValues(
 		stopped = true;
 		if (timer) clearTimeout(timer);
 	};
+}
+
+/**
+ * Write the simulator's points to the dashboard — the panel's own road.
+ *
+ * Deliberately the SAME request a device with a WLAN module makes: `POST
+ * <server>/ingest` carrying the program's own token. No campus tab in the
+ * middle, no back-channel, no session — the panel has the two things the
+ * request needs (the address and the credential) because the program told it
+ * both, in the very announcement it already listens to.
+ *
+ * `dev` marks the sender as simulated (`sim-…`, which the extension itself
+ * produces in `meineNummer`), so a dashboard shows at a glance that these
+ * readings came from a program being written rather than from a mini on a
+ * desk — and so they never collide with the real device's row.
+ *
+ * `dt` and `now` are 0 for the same reason the relay sends 0: a point posted
+ * here was produced a fraction of a second ago and the server timestamps it on
+ * arrival anyway.
+ */
+export async function sendPoints(
+	server: string,
+	ref: string,
+	dev: string,
+	points: { feed: string; value: string; to: string }[]
+): Promise<boolean> {
+	const api = base(server);
+	if (!api || !points.length || !canWrite(ref)) return false;
+	try {
+		const res = await fetch(`${api}/ingest`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				// The whole reference, not just the `W-` half: the ingest accepts a
+				// combined token and picks the half it needs (`pickToken` in the
+				// hook), so splitting here would only add a second place to get it
+				// wrong.
+				t: ref.trim(),
+				dev: dev || 'sim',
+				now: 0,
+				d: points.map((p) => ({ f: p.feed, v: coerce(p.value), dt: 0, to: p.to }))
+			})
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
+/** Numbers stay numbers, everything else travels as text — as on the wire. */
+function coerce(raw: string): number | string {
+	const trimmed = raw.trim();
+	if (trimmed === '') return '';
+	const num = Number(trimmed);
+	return Number.isFinite(num) ? num : raw;
 }
