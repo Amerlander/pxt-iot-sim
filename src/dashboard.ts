@@ -155,10 +155,19 @@ export function watchValues(
  * request needs (the address and the credential) because the program told it
  * both, in the very announcement it already listens to.
  *
- * `dev` marks the sender as simulated (`sim-…`, which the extension itself
- * produces in `meineNummer`), so a dashboard shows at a glance that these
- * readings came from a program being written rather than from a mini on a
- * desk — and so they never collide with the real device's row.
+ * `dev` marks the sender as simulated by its SIGN — a negative number, which
+ * the extension itself produces in `meineNummer`. Every id in this stack is a
+ * number (`0` the dashboard, positive a real mini, negative a simulator), so a
+ * dashboard shows at a glance that these readings came from a program being
+ * written rather than from a mini on a desk, they never collide with the real
+ * device's row, and anyone who ever wants only the real ones asks `>= 0`
+ * instead of parsing a prefix. No such filter exists today, on purpose: a
+ * simulator is a device and is read like one.
+ *
+ * An empty `dev` is NOT filled in with a placeholder. The ingest reads empty as
+ * `"0"` — the DASHBOARD — and the downlink selects exactly that, so a guessed
+ * id would come back at every mini in the room as a setpoint. Writing nothing
+ * is the correct answer until the program has announced who it is.
  *
  * `dt` and `now` are 0 for the same reason the relay sends 0: a point posted
  * here was produced a fraction of a second ago and the server timestamps it on
@@ -172,6 +181,9 @@ export async function sendPoints(
 ): Promise<boolean> {
 	const api = base(server);
 	if (!api || !points.length || !canWrite(ref)) return false;
+	// See the header: no placeholder id. Without one the points would be filed
+	// as the dashboard and pushed back at the whole room.
+	if (!dev.trim()) return false;
 	try {
 		const res = await fetch(`${api}/ingest`, {
 			method: 'POST',
@@ -182,7 +194,7 @@ export async function sendPoints(
 				// hook), so splitting here would only add a second place to get it
 				// wrong.
 				t: ref.trim(),
-				dev: dev || 'sim',
+				dev,
 				now: 0,
 				d: points.map((p) => ({ f: p.feed, v: coerce(p.value), dt: 0, to: p.to }))
 			})

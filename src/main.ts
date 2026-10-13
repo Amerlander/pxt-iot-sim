@@ -370,7 +370,26 @@ listenToSimulator({
 			announcement?.server === next.server &&
 			announcement?.scope === next.scope;
 		announcement = next;
-		if (same) return;
+		if (same) {
+			// SAME QUERY, NEW PROGRAM. An announcement always means the program
+			// started over — that is the only thing that emits one — so the panel
+			// keeps its poll but must hand the fresh program the current state
+			// again. Without this, a restarted simulator got NOTHING until some
+			// other sender happened to write: `seen` still held every value from
+			// before the reset, so the next poll found no change and pushed no
+			// lines, and `wenn … empfangen` never fired on startup.
+			//
+			// The real device does not have this hole because campus forgets its
+			// downlink cache on every hello (`forgetDeviceSession`) and re-states
+			// clock and setpoints. This is the same promise, kept the same way.
+			seen.clear();
+			clockPushed = false;
+			// Re-seeding is not "everything just changed": `firstView` keeps the
+			// highlight off, so the panel does not flash every row on a reset.
+			firstView = true;
+			if (view) absorb(view);
+			return;
+		}
 
 		stopWatching?.();
 		view = null;

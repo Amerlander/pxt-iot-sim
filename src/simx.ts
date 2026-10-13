@@ -26,7 +26,7 @@ export type SimxAnnouncement = {
 	ref: string;
 	/** Server the program names, if it names one. */
 	server: string;
-	/** The device's own id, as the simulator reports it (`sim-…`). */
+	/** The device's own id, as the simulator reports it — negative, e.g. `-42`. */
 	device: string;
 	/**
 	 * Whose values the program subscribed to (`IOT1:r:`) — d | g | a.
