@@ -85,45 +85,6 @@ header h1 {
   overflow-wrap: anywhere;
 }
 
-/* ── Der Schalter ─────────────────────────────────────────────────────── */
-
-.switch {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.4rem;
-  margin: 0.4rem 0 0;
-  font-size: 0.75rem;
-  color: var(--ink-soft);
-}
-
-label.switch {
-  cursor: pointer;
-  user-select: none;
-}
-
-label.switch:hover {
-  color: var(--ink);
-}
-
-.switch input {
-  flex: none;
-  margin: 0.15rem 0 0;
-  accent-color: var(--accent);
-}
-
-/* Not offered, or offered and failing — both are explanations, so both are
-   quiet and neither pretends to be a control. */
-.switch.off,
-.switch.err {
-  color: var(--ink-faint);
-  font-style: italic;
-}
-
-.switch.err {
-  color: hsl(4 64% 44%);
-  font-style: normal;
-}
-
 /* ── Die Werte ────────────────────────────────────────────────────────── */
 
 .feeds {

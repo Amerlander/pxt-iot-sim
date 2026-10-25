@@ -2,8 +2,7 @@
 
 Eine **Simulator-Extension** (simx) für MakeCode: ein Panel neben dem Simulator,
 das die Feeds des verknüpften IoT-Dashboards live zeigt. Damit sieht ein Kind
-beim Programmieren, was sein Programm senden *würde* und was auf dem Dashboard
-gerade steht — ohne Gerät am Kabel.
+beim Programmieren, was auf dem Dashboard gerade steht — ohne Gerät am Kabel.
 
 ## Was zu sehen ist
 
@@ -26,37 +25,26 @@ Fünftel der Höhe, um in Protokollform zu wiederholen, was die Werte darüber i
 Worten sagen. Wer die Zeilen braucht, findet sie dort, wo sie ohnehin gelesen
 werden: in der seriellen Konsole des Editors und im Campus-Stream.
 
-## Woher die Daten kommen — und wohin sie gehen
+## Woher die Daten kommen
 
-**Direkt vom Server**, nicht über den Campus-Tab. In beide Richtungen.
-
-Das ist die tragende Entscheidung, und sie gilt inzwischen auch fürs Schreiben.
-Das Panel braucht dafür genau zwei Dinge: eine Adresse und ein Token. Beides
-steht im Programm — der Dashboard-Block trägt Slug oder Token und optional die
-Serveradresse —, und das Programm sagt beides dem Panel über den simx-Kanal
-(siehe unten). Damit braucht der Simulator keinen Rückkanal zum Campus und
-funktioniert auch im nackten MakeCode.
+**Direkt vom Server**, nicht über den Campus-Tab. Das Panel braucht dafür genau
+zwei Dinge: eine Adresse und ein Token. Beides steht im Programm — der
+Dashboard-Block trägt Slug oder Token und optional die Serveradresse —, und das
+Programm sagt beides dem Panel über den simx-Kanal (siehe unten). Damit braucht
+der Simulator keinen Rückkanal zum Campus und funktioniert auch im nackten
+MakeCode.
 
 **Lesen** geht über `GET <server>/read` und läuft immer: Das Panel zeigt das
-Dashboard, das im Programm steht, live neben dem Simulator. Dafür ist es da.
+Dashboard, das im Programm steht, live neben dem Simulator, und reicht neue
+Werte als `IOT1:v:`-Zeilen an das simulierte Gerät weiter.
 
-**Schreiben** geht über `POST <server>/ingest` — dieselbe Anfrage, die ein mini
-mit WLAN-Modul stellt — und ist **standardmäßig aus**. Der Schalter dafür sitzt
-im Panel, weil hier gesendet wird oder eben nicht. Ein Schalter im Programm
-würde mit einer geteilten Datei mitreisen und die Simulatoren einer ganzen
-Klasse in ein Dashboard schreiben lassen, das niemand gefragt hat; und der
-Schalter wird bewusst nicht über Reloads gemerkt, sonst wäre „aus" keine
-Vorgabe, sondern eine Einstellung, die jemand einmal gemacht und längst
-vergessen hat.
-
-Die simulierten Werte tragen die Kennung, die die Extension selbst vergibt
-(`sim-…`, siehe `meineNummer`). Auf dem Dashboard sind sie damit als Simulation
-erkennbar und kollidieren nie mit der Zeile des echten Geräts.
-
-Nennt das Programm nur einen Kurznamen statt eines Tokens, kann das Panel nicht
-selbst schreiben — den Kurznamen kann allein der Campus auflösen, weil seine
-Relay-Route über die Sitzung autorisiert. Dann sagt das Panel das, statt einen
-Schalter anzubieten, der nichts tut.
+**Geschrieben wird nicht.** Früher gab es einen Schalter „Simulierte Werte ins
+Dashboard schreiben", der die Werte des Simulators per `POST <server>/ingest`
+mit einer negativen Seriennummer ans Dashboard schickte. Der Campus liest das
+Vorzeichen aber nicht mehr als „Simulator", ein schreibender Simulator erschiene
+dort also als ganz normales Gerät. Bis Simulatoren eine eigene Kennzeichnung
+bekommen, bleibt das Panel deshalb rein lesend; die `IOT1:d:`-Zeilen des
+Programms ignoriert es.
 
 ## Wie das Panel erfährt, welches Dashboard gemeint ist
 
@@ -77,7 +65,8 @@ abonniert dann PocketBase. Mehr braucht es nicht.
 Der Schalter „im Simulator senden" ist weg — er entfällt ersatzlos, weil der
 Grund für ihn weg ist. Er stand im Übertragungsblock, weil pxt die Ausgaben des
 Simulators an keinen Host weiterreichte; mit diesem Panel gibt es eine
-Gegenseite, also sendet der Simulator jetzt immer mit.
+Gegenseite, also schickt der Simulator seine Zeilen jetzt immer mit. Ins
+Dashboard gelangen sie trotzdem nicht (siehe oben).
 
 ## Was das Panel startet
 

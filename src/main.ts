@@ -2,9 +2,13 @@
  * The panel itself.
  *
  * Three states, and it says which one it is in — a panel that shows an empty
- * list for "no program yet", "the switch is off" and "the dashboard really is
+ * list for "no program yet", "still connecting" and "the dashboard really is
  * empty" alike would be worse than no panel, because all three look like a
  * broken dashboard.
+ *
+ * It only READS. The simulator's own datapoints go nowhere: there was a switch
+ * here that posted them to the dashboard, removed because nothing on the board
+ * could tell those readings from a real mini's (see `dashboard.ts`).
  *
  * WHAT GETS THE ROOM. The panel stands in a column some 300 px wide beside a
  * running simulator, so the one thing it is for — the CURRENT reading of each
@@ -21,10 +25,9 @@ import {
 	refLabel,
 	sendFeedsToEditor,
 	sendToSimulator,
-	type SimxAnnouncement,
-	type SimxDatapoint
+	type SimxAnnouncement
 } from './simx';
-import { canWrite, sendPoints, watchValues, type DashboardView, type Value } from './dashboard';
+import { watchValues, type DashboardView, type Value } from './dashboard';
 
 const app = document.getElementById('app') as HTMLElement;
 
@@ -43,92 +46,11 @@ function postFeeds(v: DashboardView): void {
 	sendFeedsToEditor(keys);
 }
 
-// ── Senden ────────────────────────────────────────────────────────────────
-//
-// READING AND WRITING ARE NOT THE SAME QUESTION, and the panel treats them as
-// two.
-//
-// Reading needs no permission from anybody: the panel shows the dashboard the
-// program names, live, always. That is what makes it useful while programming —
-// a child sees what is actually on the board next to the program that is
-// supposed to change it.
-//
-// Writing is a different thing entirely, because a simulator writes into a
-// board a whole class may be looking at. So it is OFF until somebody says
-// otherwise, and the switch sits HERE rather than in the program: the panel is
-// where the sending happens, so it is where the sending is decided. A switch in
-// the program would travel with a shared file and turn on twenty simulators
-// that nobody asked.
-//
-// Deliberately NOT remembered across reloads. "Default aus" has to mean off
-// every time the panel comes up, or it is not a default but a setting somebody
-// once made and has since forgotten.
-let sending = false;
-
-/**
- * Points waiting to go out, and the pacing.
- *
- * Same floor as everywhere else on this path — the ingest route accepts one
- * batch per device per ~900 ms and answers 429 beyond that. A simulator fires
- * as fast as the program loops, so without this the panel would spend its time
- * being rejected.
- */
-let outbox: SimxDatapoint[] = [];
-let flushTimer: ReturnType<typeof setTimeout> | null = null;
-let lastSentAt = 0;
-const MIN_BATCH_MS = 1000;
-/** Bounded like the device's own ring: on overflow the OLDEST point goes. */
-const MAX_OUTBOX = 60;
-/** Last outcome, so the panel can say "on, but it is not arriving". */
-let sendError = '';
-
-function queue(point: SimxDatapoint): void {
-	// Collected even while the switch is off, and then dropped on the next
-	// flush — see `flush`. Queueing unconditionally keeps the pacing honest: the
-	// gate is one place, and it is the place that posts.
-	if (outbox.length >= MAX_OUTBOX) outbox.shift();
-	outbox.push(point);
-	schedule();
-}
-
-function schedule(): void {
-	if (flushTimer || !outbox.length) return;
-	const wait = Math.max(0, lastSentAt + MIN_BATCH_MS - Date.now());
-	flushTimer = setTimeout(() => {
-		flushTimer = null;
-		void flush();
-	}, wait);
-}
-
-async function flush(): Promise<void> {
-	const batch = outbox;
-	outbox = [];
-	if (!batch.length) return;
-	// The switch is the gate, and it is checked HERE rather than in `queue`:
-	// a point produced while the switch was off belongs to the time it was off,
-	// and turning the switch on must not post a minute of backlog.
-	if (!sending || !announcement?.ref) return;
-
-	lastSentAt = Date.now();
-	const ok = await sendPoints(
-		announcement.server,
-		announcement.ref,
-		announcement.device,
-		batch
-	);
-	const before = sendError;
-	sendError = ok ? '' : 'Das Dashboard hat die Werte nicht angenommen.';
-	if (sendError !== before) render();
-	if (outbox.length) schedule();
-}
-
 // ── Lesen: was auf dem Dashboard steht, geht zurück ins Programm ──────────
 //
-// Unconditional, and it is the asymmetry that makes the panel useful. WRITING
-// is a decision somebody has to make (see `sending`); READING is what the panel
-// is for. A simulated mini that can see the board it is programmed against
-// needs no switch — nothing leaves the machine, and the values were already on
-// screen a line above.
+// Unconditional: reading is what the panel is for. A simulated mini that can
+// see the board it is programmed against needs no switch — nothing leaves the
+// machine, and the values were already on screen a line above.
 
 /** Last reading seen per feed+from+to — only CHANGES go down the wire. */
 const seen = new Map<string, string>();
@@ -189,13 +111,6 @@ function absorb(next: DashboardView): void {
 	sendToSimulator(lines);
 }
 
-function toggleSending(next: boolean): void {
-	sending = next;
-	if (!next) outbox = [];
-	sendError = '';
-	render();
-}
-
 // ── Das Bild ──────────────────────────────────────────────────────────────
 
 /** Feeds the child opened. Kept here because `innerHTML` forgets everything. */
@@ -212,7 +127,7 @@ let painted = '';
  * identical to the one already on screen.
  */
 function signature(): string {
-	const parts = [announcement?.ref ?? '', sending ? '1' : '0', sendError];
+	const parts = [announcement?.ref ?? ''];
 	for (const value of view?.values ?? []) {
 		const key = keyOf(value);
 		parts.push(key, textOf(value), String(changedAt.get(key) ?? 0));
@@ -228,7 +143,7 @@ function render(): void {
         <h1>Kein Dashboard</h1>
         <p>
           Starte ein Programm mit den IoT-Blöcken im Simulator. Es muss ein
-          Dashboard nennen — dann zeigt dieses Feld, was es sendet.
+          Dashboard nennen — dann zeigt dieses Feld, was darauf steht.
         </p>
       </section>`;
 		return;
@@ -262,7 +177,6 @@ function render(): void {
 	app.innerHTML = `
     <header>
       <h1 title="${escape(announcement.ref)}">${escape(refLabel(announcement.ref))}</h1>
-      ${sendSwitch()}
     </header>
     <div class="feeds">${feeds || '<p class="empty">Noch keine Werte.</p>'}</div>`;
 	wire();
@@ -325,31 +239,7 @@ function brief(text: string): string {
 	return text.length > 16 ? `${text.slice(0, 15)}…` : text;
 }
 
-/**
- * The switch, and what it says when it cannot be offered.
- *
- * With a slug instead of a token the panel holds no credential of its own, so
- * there is nothing to switch on - and a disabled control with a reason beats a
- * control that silently does nothing. That case is not a fault: a slug is the
- * normal shape for a program that relies on campus to carry its data.
- */
-function sendSwitch(): string {
-	if (!announcement?.ref) return '';
-	if (!canWrite(announcement.ref)) {
-		return `<p class="switch off">Der Simulator kann hier nicht selbst senden &mdash;
-		  das Programm nennt einen Kurznamen statt eines Schreib-Tokens.</p>`;
-	}
-	return `
-	  <label class="switch">
-	    <input type="checkbox" id="sendToggle" ${sending ? 'checked' : ''} />
-	    <span>Simulierte Werte ins Dashboard schreiben</span>
-	  </label>
-	  ${sendError ? `<p class="switch err">${escape(sendError)}</p>` : ''}`;
-}
-
 function wire(): void {
-	const box = document.getElementById('sendToggle') as HTMLInputElement | null;
-	if (box) box.onchange = () => toggleSending(box.checked);
 	// Noted, not re-rendered: `<details>` opens itself. The note exists only so
 	// the next redraw can put the panel back the way the child left it.
 	app.querySelectorAll<HTMLDetailsElement>('details.feed').forEach((el) => {
@@ -369,7 +259,6 @@ function escape(text: string): string {
 }
 
 listenToSimulator({
-	onDatapoint: (point) => queue(point),
 	onAnnouncement: (next) => {
 		// Only restart the watch when the ANSWER changes: the program repeats its
 		// announcement on every reset, and tearing the poll down for an identical

@@ -10,7 +10,8 @@
  *   IOT1:h:<ref>       slug or token — WHICH dashboard
  *   IOT1:i:<serial>    who the device is
  *   IOT1:r:<scope>     whose values it wants to read
- *   IOT1:d:<to>:<feed>:<value>   a datapoint it would have sent
+ *   IOT1:d:<to>:<feed>:<value>   a datapoint it would have sent — ignored
+ *                                here, the panel only reads the dashboard
  *
  * Deliberately no second protocol: the panel reads the same lines a real
  * device would write, so anything it shows is something a device would really
@@ -26,7 +27,7 @@ export type SimxAnnouncement = {
 	ref: string;
 	/** Server the program names, if it names one. */
 	server: string;
-	/** The device's own id, as the simulator reports it — negative, e.g. `-42`. */
+	/** The device's own id, as the simulator reports it (`IOT1:i:`). */
 	device: string;
 	/**
 	 * Whose values the program subscribed to (`IOT1:r:`) — d | g | a.
@@ -40,8 +41,6 @@ export type SimxAnnouncement = {
 	 */
 	scope: string;
 };
-
-export type SimxDatapoint = { feed: string; value: string; to: string };
 
 /**
  * The human-readable half of a reference.
@@ -73,7 +72,6 @@ export function refLabel(ref: string): string {
  */
 export type SimxHandlers = {
 	onAnnouncement?: (a: SimxAnnouncement) => void;
-	onDatapoint?: (p: SimxDatapoint) => void;
 };
 
 /** pxt may hand the payload over as text or as bytes; accept both. */
@@ -220,18 +218,6 @@ export function listenToSimulator(handlers: SimxHandlers): () => void {
 							? 'devices'
 							: 'dashboard';
 				if (announcement.ref) handlers.onAnnouncement?.({ ...announcement });
-			} else if (kind === 'd') {
-				// <to>:<feed>:<value…> — the value is last and may contain colons.
-				const first = rest.indexOf(':');
-				const second = rest.indexOf(':', first + 1);
-				if (first < 0 || second < 0) continue;
-				const feed = rest.slice(first + 1, second).trim();
-				if (!feed) continue;
-				handlers.onDatapoint?.({
-					to: rest.slice(0, first).trim(),
-					feed,
-					value: rest.slice(second + 1)
-				});
 			}
 		}
 	};
