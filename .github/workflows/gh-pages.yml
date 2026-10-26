@@ -1,0 +1,39 @@
+# Publishes the built panel to the gh-pages branch.
+#
+# MakeCode does not load a simulator extension from an arbitrary URL. Outside
+# localhost+simxdev it serves the panel from its own sim origin
+# (<sim-origin>/simx/<key>/-/index.html), filled from the gh-pages branch at
+# the commit pinned as `sha` in pxt-calliope/targetconfig.json
+# (approvedRepoLib["amerlander/pxt-calliope-iot"].simx, with
+# "repo": "amerlander/pxt-iot-sim"). pxt-jacdac works the same way.
+#
+# Commits go on top of the existing branch (no orphan force-push), so every
+# sha a targetconfig ever pinned stays reachable.
+name: gh-pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: touch dist/.nojekyll
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+          full_commit_message: Publish simx panel built from main@${{ github.sha }}

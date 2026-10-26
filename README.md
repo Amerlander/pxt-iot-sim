@@ -101,18 +101,22 @@ und dort wartet `serialRelay.handleSimulatorMessage` auf genau den Kanal `iot`.
 
 In `pxt-calliope/targetconfig.json` unter `packages.approvedRepoLib` — und zwar
 beim Schlüssel der EXTENSION, nicht bei dem des Panels. pxt schlägt den simx
-über den Kanal nach, den das Programm sendet, und das ist der Repo-Name von
-`pxt-grove`:
+über den Kanal nach, den das Programm sendet, und das ist der Repo-Name der
+Extension (`iotsim.panelKey()` in `pxt-calliope-iot`):
 
 ```json
-"amerlander/pxt-grove": {
+"amerlander/pxt-calliope-iot": {
     "simx": {
-        "sha": "<commit-sha>",
+        "repo": "amerlander/pxt-iot-sim",
+        "sha": "<commit-sha auf gh-pages>",
         "devUrl": "http://localhost:3400",
         "aspectRatio": 0.78
     }
 }
 ```
+
+`repo` ist nötig, weil das Panel nicht im Repo der Extension liegt: Ohne den
+Eintrag sucht MakeCode den `gh-pages`-Zweig von `pxt-calliope-iot`.
 
 `aspectRatio` ist **Breite geteilt durch Höhe** und die einzige Stelle, an der
 die Höhe des Panels festgelegt wird: pxt setzt daraus `padding-bottom: 100/r %`
@@ -124,6 +128,30 @@ liegenden Boards. 0.78 macht sie 1,28 Breiten hoch, also gut die Hälfte mehr.
 `devUrl` greift, solange der Editor mit `simxdev=1` läuft — das tut die
 Campus-Einbettung bereits (die iframe-URL trägt den Parameter, sobald der Editor
 selbst auf localhost liegt). Für den Produktivbetrieb zählt der `sha`.
+
+## Veröffentlichen
+
+Das gehostete MakeCode (makecode.calliope.cc) lädt ein Panel **nie** von einer
+fremden Adresse. Außerhalb von localhost mit `simxdev` berechnet pxt die URL
+selbst: `<sim-origin>/simx/amerlander/pxt-calliope-iot/-/index.html`. Den
+Inhalt dahinter holt das MakeCode-Backend aus dem `gh-pages`-Zweig von `repo`,
+und zwar genau den Commit aus `sha`. Eine eigene GitHub Page oder ein Hosting im
+Campus-Stack nimmt es nicht, auch kein Redirect dorthin: Der Simulator postet
+nur an die Origin der berechneten URL (`frame.dataset['origin']` in
+`pxtsim/simdriver.ts`). `pxt-jacdac` geht denselben Weg.
+
+Also:
+
+1. Push auf `main` → der Workflow `gh-pages` baut `dist/` und legt es als neuen
+   Commit auf `gh-pages` (ohne Force-Push, damit jeder einmal eingetragene
+   `sha` erreichbar bleibt). Von Hand geht dasselbe mit `npm run build` und
+   einem Commit von `dist/` (plus `.nojekyll`) auf `gh-pages`.
+2. Den neuen `gh-pages`-Commit als `sha` in `pxt-calliope/targetconfig.json`
+   eintragen.
+3. Das Target neu ausrollen. Erst danach sieht makecode.calliope.cc das Panel.
+
+Nebenbei liegt derselbe Stand unter https://amerlander.github.io/pxt-iot-sim/:
+zum Anschauen, und als `devUrl`, wenn man lokal ohne `npm run dev` testen will.
 
 ## Entwickeln
 
