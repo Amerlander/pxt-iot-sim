@@ -159,6 +159,23 @@ export function sendToSimulator(lines: string[]): void {
 }
 
 /**
+ * Hand the dashboard's feed names to the editor's feed suggestions.
+ *
+ * The feed inputs of the IoT blocks are text fields with a suggestion list;
+ * pxt-calliope (`fieldeditors/iotFeedOptions.ts`) adds whatever is posted to
+ * the editor window as `calliope-iot-feeds`. Campus sends the same message
+ * when it embeds the editor — this is the same help for MakeCode without
+ * campus, where the panel is the only thing that knows the dashboard.
+ *
+ * Our parent is the editor window (pxt's simulator driver creates the simx
+ * frame in the editor document), which is exactly where the receiver listens.
+ */
+export function sendFeedsToEditor(feeds: string[]): void {
+	if (window.parent === window) return;
+	window.parent.postMessage({ type: 'calliope-iot-feeds', feeds }, '*');
+}
+
+/**
  * Listen for the simulator's IoT lines.
  *
  * The announcement is accumulated rather than replaced field by field: the

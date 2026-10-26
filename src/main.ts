@@ -19,6 +19,7 @@ import {
 	announceReady,
 	listenToSimulator,
 	refLabel,
+	sendFeedsToEditor,
 	sendToSimulator,
 	type SimxAnnouncement,
 	type SimxDatapoint
@@ -30,6 +31,17 @@ const app = document.getElementById('app') as HTMLElement;
 let announcement: SimxAnnouncement | null = null;
 let view: DashboardView | null = null;
 let stopWatching: (() => void) | null = null;
+/** The feed set last handed to the editor, so a poll that changed nothing posts nothing. */
+let feedsPosted: string | null = null;
+
+/** The editor's feed suggestions follow the dashboard (see `sendFeedsToEditor`). */
+function postFeeds(v: DashboardView): void {
+	const keys = Array.from(new Set(v.feeds.map((f) => f.key))).sort();
+	const signature = keys.join('\n');
+	if (signature === feedsPosted) return;
+	feedsPosted = signature;
+	sendFeedsToEditor(keys);
+}
 
 // ── Senden ────────────────────────────────────────────────────────────────
 //
@@ -398,10 +410,12 @@ listenToSimulator({
 		changedAt.clear();
 		firstView = true;
 		clockPushed = false;
+		feedsPosted = null;
 		stopWatching = watchValues(next.server, next.ref, next.scope, (v) => {
 			view = v;
 			absorb(v);
 			render();
+			postFeeds(v);
 		});
 	}
 });
