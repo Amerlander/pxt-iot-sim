@@ -1,0 +1,9 @@
+{
+  "setup": "npm ci",
+  "checks": ["npx tsc -p .", "npm run build"],
+  "demo": { "language": "de" },
+  "app": {
+    "run": "The app is the simulator panel MakeCode embeds beside its simulator (a Vite page, no backend, no login). Start it with `node .obeya/app.mjs start` (after `npm ci`): it starts in the background, in this workspace, the Vite dev server on port 3400 (the port MakeCode's devUrl names; a free one when another workspace holds it) and a fake dashboard server on 3401 (or a free one), waits until both answer, and prints both URLs; they are also in `node_modules/.obeya-app.json` (panelUrl, harnessUrl). Open the harnessUrl for anything worth showing: it embeds the panel at its MakeCode size, announces the dashboard `demo-klasse` the way a program with the IoT blocks does, and lists beside it the `IOT1:` lines the panel sends down to the simulator and the feed names it hands to the editor. The fake dashboard has five readings (temperatur, nachricht, ziel from the dashboard; licht and temperatur from the mini 48213); temperatur and licht change every few seconds, so the panel visibly follows them. `?scope=d` (dashboard only), `?scope=g` (minis only) or `?scope=a` (default, both) on the harness URL picks whose values the program reads. The panelUrl alone shows only the empty state („Kein Dashboard“). Vite reloads the panel by itself after a change under `src/`, and the harness announces the dashboard again to the reloaded panel; nothing to do. After a change to `.obeya/app.mjs`, start again (it stops the old run first). A real MakeCode or campus needs a running editor with `simxdev=1` and a real dashboard token; neither is needed or available for a demo. Stop it with `node .obeya/app.mjs stop`, which kills exactly the processes it started here, by PID.",
+    "stop": "node .obeya/app.mjs stop"
+  }
+}
