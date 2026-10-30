@@ -59,11 +59,11 @@
 
   /* neutral-100, campus's text colour. */
   --ink: hsl(210 4% 11%);
-  /* The muted text of campus's IoT tables — dark enough to stay readable at
-     the small sizes it is used at here. */
-  --ink-soft: hsl(190 8% 45%);
-  /* neutral-50: labels and marks that should all but disappear. */
-  --ink-faint: hsl(190 12% 61%);
+  /* The muted text of campus's IoT tables, five points darker. Campus sets it
+     at body size on white; here it runs down to 10px on the tinted surface,
+     and campus's own value (4.1:1 there) falls short of AA. This one keeps
+     4.5:1 on every surface of the panel. */
+  --ink-soft: hsl(190 8% 40%);
   --surface: hsl(0 0% 100%);
   /* The one tint in the panel, and it is a surface rather than a line: it marks
      the row under the pointer and the opened table, nothing else. The shade
@@ -71,8 +71,10 @@
   --surface-warm: hsl(156 12% 95%);
   /* neutral-10: the counter beside a feed name. */
   --surface-mark: hsl(156 12% 92%);
-  /* Campus's interactive cyan, for the focus ring and nothing else. */
-  --accent: hsl(181 57% 53%);
+  /* Campus's interactive cyan, for the focus ring and nothing else — taken
+     down to a third of its lightness, because the brand value (2:1 on white)
+     would draw a ring nobody can see. */
+  --accent: hsl(181 60% 32%);
 }
 
 * {
@@ -93,6 +95,10 @@ body {
   background: var(--surface);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: hsl(181 57% 53% / 0.3);
 }
 
 /* Campus's focus ring: the only place its cyan shows up here, and only for
@@ -120,12 +126,12 @@ header h1 {
   margin: 0;
   /* Capped hard. This is a dashboard slug, and a slug can be twelve random
      letters — at heading size it took three lines and pushed the data off
-     screen. It is a label, so it is set like one: the small spaced capitals
-     campus puts over its tables. */
-  font-size: 0.68rem;
+     screen. It is a label, so it is sized like one. Not in capitals, though
+     campus sets its labels that way: the slug is a name a child may type into
+     the dashboard block, and "DEMO-KLASSE" is not the name they would type. */
+  font-size: 0.75rem;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--ink-soft);
   overflow-wrap: anywhere;
 }
@@ -135,12 +141,23 @@ header h1 {
 .feeds {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 0.125rem 0 0.75rem;
+  /* The browser's own scrollbar takes 15 of the 300 px; a thin one in the
+     panel's grey takes a third of that. */
+  scrollbar-width: thin;
+  scrollbar-color: hsl(156 12% 80%) transparent;
 }
 
 .feed {
   padding: 0;
+}
+
+/* An opened feed is one tinted block, its line and its table together, so the
+   two read as one thing rather than a white row with a grey box under it. */
+.feed[open] {
+  background: var(--surface-warm);
 }
 
 /* The line a child reads: name on the left, reading on the right, one row per
@@ -164,18 +181,21 @@ header h1 {
 }
 
 /* The only mark on the panel that is drawn rather than written, and it earns it:
-   without it nothing says the row can be opened. Kept faint and small enough to
-   read as punctuation. Campus's own caret (the sender list in its feed table:
-   `M9 6l6 6-6 6`, round caps, turning a quarter when open), drawn as a mask so
-   it takes its colour from the stylesheet rather than from the SVG. */
+   without it nothing says the row can be opened. Small enough to read as
+   punctuation, but in the soft ink rather than anything paler: a child who
+   cannot see it will never open a row. Campus's own caret (the sender list in
+   its feed table: `M9 6l6 6-6 6`, round caps, turning a quarter when open),
+   drawn as a mask so it takes its colour from the stylesheet. */
 .feed summary::before {
   content: '';
   flex: none;
-  align-self: center;
-  width: 0.7rem;
-  height: 0.7rem;
-  margin: 0 -0.15rem 0 -0.2rem;
-  background: var(--ink-faint);
+  /* On the first line of the name, not the middle of the row: a long name
+     wraps, and a caret halfway down it points at nothing. */
+  align-self: flex-start;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: 0.2rem -0.15rem 0 -0.2rem;
+  background: var(--ink-soft);
   -webkit-mask: var(--caret) center / contain no-repeat;
   mask: var(--caret) center / contain no-repeat;
   transition: transform 0.2s ease;
@@ -186,10 +206,18 @@ header h1 {
   transform: rotate(90deg);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .feed summary::before {
+    transition: none;
+  }
+}
+
 .feed .name {
-  flex: 1 1 auto;
+  /* Never narrower than a short word: a wide value took the rest, and the
+     name went down the row one letter per line. */
+  flex: 1 0 4.5rem;
   min-width: 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--ink-soft);
   overflow-wrap: anywhere;
 }
@@ -203,7 +231,7 @@ header h1 {
   padding: 0 0.4em;
   border-radius: 9999px;
   background: var(--surface-mark);
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 600;
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
@@ -212,7 +240,12 @@ header h1 {
 }
 
 .feed .val {
-  flex: none;
+  /* Gives way before the name does, and says so with an ellipsis; the table
+     under it has the whole value. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   /* The one thing on the panel allowed to be big. Tabular figures so a value
      going from 9 to 10 does not shift the row — the whole point of watching it
      is to see the number, not the motion. */
@@ -224,6 +257,12 @@ header h1 {
   line-height: 1.1;
   letter-spacing: -0.01em;
   white-space: nowrap;
+}
+
+/* A message rather than a measurement. It is read, not watched, and at the
+   size of a number it was the widest and loudest thing on the panel. */
+.feed .val.text {
+  font-size: 1rem;
 }
 
 /* ── Die Tabelle darunter ─────────────────────────────────────────────── */
@@ -243,18 +282,17 @@ header h1 {
   table-layout: fixed;
   font-size: 0.7rem;
   color: var(--ink-soft);
-  background: var(--surface-warm);
 }
 
 .feed th {
   padding: 0.3rem 0.35rem 0.15rem 0;
   text-align: left;
   /* Campus's table heads: small spaced capitals in the muted colour. */
-  font-size: 0.6rem;
+  font-size: 0.66rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-soft);
 }
 
 .feed td {
@@ -283,7 +321,6 @@ header h1 {
   /* Tabular figures rather than a monospace face: campus sets its time column
      in the body font, and a second typeface for one column would be noise. */
   font-variant-numeric: tabular-nums;
-  color: var(--ink-faint);
   white-space: nowrap;
 }
 
@@ -310,5 +347,10 @@ header h1 {
 
 .empty p {
   margin: 0;
+  font-size: 0.8rem;
+}
+
+/* "Noch keine Werte." is the paragraph itself, not one inside an empty state. */
+p.empty {
   font-size: 0.8rem;
 }
