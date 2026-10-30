@@ -191,36 +191,33 @@ function render(): void {
  */
 function feedBlock(feed: string, values: Value[]): string {
 	const rows = values.map(valueRow).join('');
-	// The number of senders is only worth saying when there is more than one; on
-	// a single-row feed it would be a "1" beside every name on the panel.
-	// The bare figure means nothing to a child who has not opened the row yet, so
-	// it says what it counts to anyone who points at it or reads it aloud.
-	const count =
-		values.length > 1
-			? `<span class="count" title="${values.length} Absender" aria-label="${values.length} Absender">${values.length}</span>`
-			: '';
+	// Closed, a feed is its name and its newest reading and nothing else: no
+	// sender count, no caret. Who sent what is the opened row's business.
 	// A message is set smaller than a number: it is read once, not watched.
 	const kind = values[0].num === null ? 'val text' : 'val';
 	return `
       <details class="feed" data-feed="${escape(feed)}"${opened.has(feed) ? ' open' : ''}>
         <summary>
-          <span class="name">${escape(feed)}${count}</span>
+          <span class="name">${escape(feed)}</span>
           <span class="${kind}">${escape(brief(textOf(values[0])))}</span>
         </summary>
         <table>
-          <tr><th>Zeit</th><th>Wert</th><th>Von</th><th>An</th></tr>
+          <tr><th>Zeit</th><th>Von</th><th>Wert</th></tr>
           ${rows}
         </table>
       </details>`;
 }
 
+/**
+ * Time, sender, value — in the order a stream is read. No recipient column:
+ * nearly every reading goes to everyone, and a column that says "alle" on
+ * every row was width taken from the value.
+ */
 function valueRow(value: Value): string {
-	const to = value.to_dev ? senderName(value.to_dev) : 'alle';
 	return `<tr>
             <td class="when">${when(changedAt.get(keyOf(value)))}</td>
-            <td class="num">${escape(textOf(value))}</td>
             <td>${escape(senderName(value.from_dev))}</td>
-            <td>${escape(to)}</td>
+            <td class="num">${escape(textOf(value))}</td>
           </tr>`;
 }
 
