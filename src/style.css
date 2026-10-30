@@ -24,21 +24,55 @@
  * thing the child actually came for.
  */
 
-:root {
-  /* MakeCode's own family, so the panel reads as part of the editor rather
-     than as a web page that happens to be embedded in it. */
-  --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
-  --mono: 'Cascadia Mono', Consolas, 'SF Mono', ui-monospace, monospace;
+/* Campus's typeface, self-hosted the way campus hosts it (`src/scss/fonts.scss`
+   there): the variable Roboto from fontsource, Latin subsets only, registered
+   under the plain family name. `unicode-range` keeps the second file from loading
+   unless a feed name actually needs it. */
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
-  --ink: hsl(210 8% 16%);
-  --ink-soft: hsl(210 6% 42%);
-  --ink-faint: hsl(210 6% 58%);
+@font-face {
+  font-family: 'Roboto';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/roboto/files/roboto-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308,
+    U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113,
+    U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Campus's palette (`src/scss/colors.scss` and the IoT screens there), taken
+   over value for value so the panel and the dashboard it mirrors read as one
+   product. Only the quiet end of it, though: the brand green, the device colours
+   and the ink pills of campus's feed table would each pull the eye off the
+   simulator, which is the one thing this panel must never do. */
+:root {
+  --font: 'Roboto', 'Segoe UI', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+
+  /* neutral-100, campus's text colour. */
+  --ink: hsl(210 4% 11%);
+  /* The muted text of campus's IoT tables — dark enough to stay readable at
+     the small sizes it is used at here. */
+  --ink-soft: hsl(190 8% 45%);
+  /* neutral-50: labels and marks that should all but disappear. */
+  --ink-faint: hsl(190 12% 61%);
   --surface: hsl(0 0% 100%);
   /* The one tint in the panel, and it is a surface rather than a line: it marks
-     the row under the pointer and the opened table, nothing else. */
-  --surface-warm: hsl(210 20% 97%);
-  /* The Calliope teal the editor already uses for its own controls. */
-  --accent: hsl(184 64% 38%);
+     the row under the pointer and the opened table, nothing else. The shade
+     campus uses for the device rows under a feed. */
+  --surface-warm: hsl(156 12% 95%);
+  /* neutral-10: the counter beside a feed name. */
+  --surface-mark: hsl(156 12% 92%);
+  /* Campus's interactive cyan, for the focus ring and nothing else. */
+  --accent: hsl(181 57% 53%);
 }
 
 * {
@@ -57,6 +91,15 @@ body {
   line-height: 1.45;
   color: var(--ink);
   background: var(--surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Campus's focus ring: the only place its cyan shows up here, and only for
+   someone moving through the panel by keyboard. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 #app {
@@ -77,10 +120,12 @@ header h1 {
   margin: 0;
   /* Capped hard. This is a dashboard slug, and a slug can be twelve random
      letters — at heading size it took three lines and pushed the data off
-     screen. It is a label, so it is sized like one. */
-  font-size: 0.85rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+     screen. It is a label, so it is set like one: the small spaced capitals
+     campus puts over its tables. */
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--ink-soft);
   overflow-wrap: anywhere;
 }
@@ -120,22 +165,25 @@ header h1 {
 
 /* The only mark on the panel that is drawn rather than written, and it earns it:
    without it nothing says the row can be opened. Kept faint and small enough to
-   read as punctuation. */
+   read as punctuation. Campus's own caret (the sender list in its feed table:
+   `M9 6l6 6-6 6`, round caps, turning a quarter when open), drawn as a mask so
+   it takes its colour from the stylesheet rather than from the SVG. */
 .feed summary::before {
   content: '';
   flex: none;
-  width: 0.3rem;
-  height: 0.3rem;
-  margin-right: -0.1rem;
-  border-right: 1.5px solid var(--ink-faint);
-  border-bottom: 1.5px solid var(--ink-faint);
-  opacity: 0.55;
-  transform: translateY(-0.12rem) rotate(-45deg);
-  transition: transform 0.12s ease;
+  align-self: center;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin: 0 -0.15rem 0 -0.2rem;
+  background: var(--ink-faint);
+  -webkit-mask: var(--caret) center / contain no-repeat;
+  mask: var(--caret) center / contain no-repeat;
+  transition: transform 0.2s ease;
+  --caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 6l6 6-6 6'/%3E%3C/svg%3E");
 }
 
 .feed[open] > summary::before {
-  transform: translateY(-0.18rem) rotate(45deg);
+  transform: rotate(90deg);
 }
 
 .feed .name {
@@ -146,17 +194,21 @@ header h1 {
   overflow-wrap: anywhere;
 }
 
-/* How many senders are behind this one reading. A number, not a badge: a pill
-   here would be the box this panel just got rid of. */
+/* How many senders are behind this one reading. Campus says this with a pill
+   beside the feed name; here the pill keeps the shape but drops the ink — a
+   pale tint with soft figures, so it reads as a footnote, not a button. */
 .feed .count {
-  margin-left: 0.3rem;
-  font-size: 0.68rem;
-  color: var(--ink-faint);
-}
-
-.feed .count::before {
-  content: '×';
-  margin-right: 0.1em;
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0 0.4em;
+  border-radius: 9999px;
+  background: var(--surface-mark);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  vertical-align: 0.05em;
 }
 
 .feed .val {
@@ -166,9 +218,11 @@ header h1 {
      is to see the number, not the motion. */
   font-variant-numeric: tabular-nums;
   font-size: 1.3rem;
-  font-weight: 600;
+  /* Medium, not bold: in Roboto that is still the darkest thing on the panel,
+     and it keeps a column of readings from shouting next to the simulator. */
+  font-weight: 500;
   line-height: 1.1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
@@ -193,9 +247,13 @@ header h1 {
 }
 
 .feed th {
-  padding: 0.15rem 0.35rem 0.15rem 0;
+  padding: 0.3rem 0.35rem 0.15rem 0;
   text-align: left;
-  font-weight: 400;
+  /* Campus's table heads: small spaced capitals in the muted colour. */
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--ink-faint);
 }
 
@@ -222,8 +280,9 @@ header h1 {
 }
 
 .feed .when {
-  font-family: var(--mono);
-  font-size: 0.66rem;
+  /* Tabular figures rather than a monospace face: campus sets its time column
+     in the body font, and a second typeface for one column would be noise. */
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   white-space: nowrap;
 }
