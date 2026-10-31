@@ -129,11 +129,14 @@ async function answers(url) {
 /**
  * Answers `/api/iot/v1/read` the way campus does (`w: [{ f, v, from, to }]`,
  * newest first, plus `ts`/`tzo`), with values that move so a demo shows the
- * panel following them. `/` is the harness page.
+ * panel following them. `/` is the harness page. `POST /offline?on=1|0` takes
+ * the dashboard off the network and back: `/read` then drops the connection
+ * the way a server that is down does, while the harness page itself stays.
  */
 function serveFake(port, panelUrl) {
 	const started = Date.now();
 	const MINI = '48213';
+	let offline = false;
 
 	const rows = (scope) => {
 		const t = (Date.now() - started) / 1000;
@@ -153,7 +156,13 @@ function serveFake(port, panelUrl) {
 
 	createServer((req, res) => {
 		const url = new URL(req.url, `http://${HOST}:${port}`);
+		if (url.pathname === '/offline' && req.method === 'POST') {
+			offline = url.searchParams.get('on') === '1';
+			res.writeHead(204);
+			return res.end();
+		}
 		if (url.pathname === '/api/iot/v1/read') {
+			if (offline) return req.socket.destroy();
 			if (url.searchParams.get('t') !== 'R-demo') {
 				res.writeHead(403, { 'access-control-allow-origin': '*' });
 				return res.end();
@@ -185,6 +194,10 @@ function serveFake(port, panelUrl) {
  * extension does. Beside it, what the panel sends back: the `IOT1:` lines for
  * the simulated mini and the feed names for the editor's suggestions.
  * `?scope=d|g|a` picks whose values the "program" reads (default a).
+ *
+ * Two switches under it for the panel's failure states: the dashboard taken off
+ * the network, and a program that names a dashboard the server does not know
+ * (announced afresh, as a restarted program would).
  */
 function harness(panelUrl, server) {
 	return `<!doctype html>
@@ -196,20 +209,37 @@ function harness(panelUrl, server) {
   h2 { font-size: 13px; text-transform: uppercase; color: #555; margin: 0 0 8px; }
   pre { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 8px; height: 300px; width: 380px; overflow: auto; margin: 0; }
   p { color: #555; max-width: 380px; }
+  .controls { margin-top: 12px; display: grid; gap: 6px; color: #333; }
 </style></head><body>
-<div class="sim"><h2>Simulator-Panel</h2><iframe id="panel" src="${panelUrl}#obeya-harness"></iframe></div>
+<div class="sim"><h2>Simulator-Panel</h2><iframe id="panel" src="${panelUrl}#obeya-harness"></iframe>
+<div class="controls">
+  <label><input type="checkbox" id="online" checked autocomplete="off"> Dashboard erreichbar</label>
+  <label>Programm nennt <select id="board" autocomplete="off">
+    <option value="demo-klasse:R-demo">demo-klasse</option>
+    <option value="andere-klasse:R-unbekannt">andere-klasse (unbekannt)</option>
+  </select></label>
+</div></div>
 <div><h2>Vom Panel an den Simulator</h2><pre id="log"></pre>
 <p id="feeds">Feed-Vorschläge an den Editor: –</p></div>
 <script>
   const scope = new URLSearchParams(location.search).get('scope') || 'a';
   const frame = document.getElementById('panel');
   const log = document.getElementById('log');
-  const lines = ['IOT1:s:${server}', 'IOT1:h:demo-klasse:R-demo', 'IOT1:i:1', 'IOT1:r:' + scope];
+  const board = document.getElementById('board');
+  const announce = () => {
+    const lines = ['IOT1:s:${server}', 'IOT1:h:' + board.value, 'IOT1:i:1', 'IOT1:r:' + scope];
+    frame.contentWindow.postMessage({ type: 'messagepacket', channel: 'iot',
+      data: new TextEncoder().encode(lines.join('\\n')) }, '*');
+  };
+  board.onchange = announce;
+  document.getElementById('online').onchange = (e) =>
+    fetch('/offline?on=' + (e.target.checked ? '0' : '1'), { method: 'POST' });
+  // A reload must not leave the dashboard off behind a ticked box.
+  fetch('/offline?on=0', { method: 'POST' });
   addEventListener('message', (e) => {
     const m = e.data || {};
     if (m.type === 'ready') {
-      frame.contentWindow.postMessage({ type: 'messagepacket', channel: 'iot',
-        data: new TextEncoder().encode(lines.join('\\n')) }, '*');
+      announce();
     } else if (m.type === 'messagepacket') {
       const time = new Date().toLocaleTimeString('de-DE');
       log.textContent += new TextDecoder().decode(m.data).split('\\n').map((l) => time + '  ' + l).join('\\n') + '\\n';

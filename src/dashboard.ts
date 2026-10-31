@@ -31,6 +31,26 @@ export type DashboardView = {
 	zone: number;
 };
 
+/**
+ * Why a poll came back empty-handed, sorted by what the person in front of the
+ * panel would have to check — the only reason to tell the cases apart at all.
+ *
+ *   address      the program names no server (or none that parses), or no
+ *                dashboard: nothing was asked
+ *   refused      the server answered, but not with the board: unknown slug,
+ *                wrong token
+ *   unreachable  no answer, or no usable one: wrong host, the server is down,
+ *                the network is
+ */
+export type ReadFailure = 'address' | 'refused' | 'unreachable';
+
+/**
+ * Longer than any healthy answer takes, shorter than the browser's own limit,
+ * which runs to minutes — a host that swallows the request without answering
+ * would otherwise hold the poll, and with it the panel, at its last word.
+ */
+const READ_TIMEOUT_MS = 6000;
+
 /** `R-…`, `W-…` or `R-…:W-…` — anything else is a slug. */
 function readTokenOf(ref: string): string {
 	for (const part of ref.split(':')) {
@@ -62,26 +82,33 @@ function base(server: string): string {
  * panel builds its feed list from what it sees rather than asking for one.
  * That also means a feed nobody has written yet does not appear, which is
  * honest: it does not exist on the dashboard either.
+ *
+ * A failure comes back as its reason rather than as nothing: the panel has to
+ * be able to say that it cannot reach the board, not just keep waiting for it.
  */
 export async function readValues(
 	server: string,
 	ref: string,
 	scope = 'dashboard'
-): Promise<DashboardView | null> {
+): Promise<DashboardView | ReadFailure> {
 	const api = base(server);
 	const token = readTokenOf(ref) || ref.trim();
-	if (!api || !token) return null;
+	if (!api || !token) return 'address';
 
 	let payload: any;
 	try {
 		// The scope is the PROGRAM's question, not ours — see SimxAnnouncement.
 		const res = await fetch(
-			`${api}/read?t=${encodeURIComponent(token)}&scope=${encodeURIComponent(scope)}`
+			`${api}/read?t=${encodeURIComponent(token)}&scope=${encodeURIComponent(scope)}`,
+			{ signal: AbortSignal.timeout(READ_TIMEOUT_MS) }
 		);
-		if (!res.ok) return null;
+		// 4xx is the server's considered no; anything else is a server that is
+		// not (all) there.
+		if (res.status >= 400 && res.status < 500) return 'refused';
+		if (!res.ok) return 'unreachable';
 		payload = await res.json();
 	} catch {
-		return null;
+		return 'unreachable';
 	}
 
 	const rows: any[] = Array.isArray(payload?.w) ? payload.w : [];
@@ -115,21 +142,27 @@ export async function readValues(
  * enough for watching a value change while programming and slow enough that a
  * classroom of open editors does not become a load problem — the same
  * reasoning that puts the relay's own read poll at twelve.
+ *
+ * It keeps polling through failures and reports each one: whether a run of them
+ * is worth telling anybody about is the panel's call, and a board that comes
+ * back has to be noticed without anyone pressing anything.
  */
 export function watchValues(
 	server: string,
 	ref: string,
 	scope: string,
-	onView: (view: DashboardView) => void
+	onView: (view: DashboardView) => void,
+	onFailure: (reason: ReadFailure) => void
 ): () => void {
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
 	const tick = async () => {
 		if (stopped) return;
-		const view = await readValues(server, ref, scope);
+		const result = await readValues(server, ref, scope);
 		if (stopped) return;
-		if (view) onView(view);
+		if (typeof result === 'string') onFailure(result);
+		else onView(result);
 		timer = setTimeout(tick, 2000);
 	};
 	void tick();

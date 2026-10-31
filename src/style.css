@@ -134,6 +134,15 @@ header h1 {
   overflow-wrap: anywhere;
 }
 
+/* Cut off from the dashboard with values on screen: one line under the name,
+   in the name's own voice. No red, no icon — the faded readings below already
+   say something is off; this only says what and since when. */
+header .offline {
+  margin: 0.125rem 0 0;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+}
+
 /* ── Die Werte ────────────────────────────────────────────────────────── */
 
 .feeds {
@@ -214,6 +223,14 @@ header h1 {
    size of a number it was the widest and loudest thing on the panel. */
 .feed .val.text {
   font-size: 1rem;
+}
+
+/* Readings nobody has confirmed for a while. Faded rather than hidden or
+   struck through: they are still the last thing known, just not to be read as
+   now. The names stay as they are, so the list keeps its shape. */
+.feeds.stale .val,
+.feeds.stale .num {
+  opacity: 0.4;
 }
 
 /* ── Die Tabelle darunter ─────────────────────────────────────────────── */
@@ -299,6 +316,13 @@ header h1 {
 .empty p {
   margin: 0;
   font-size: 0.8rem;
+}
+
+/* "It will keep trying" is reassurance, not instruction: set apart from the
+   advice above it, and a step quieter. */
+.empty p.retry {
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
 }
 
 /* "Noch keine Werte." is the paragraph itself, not one inside an empty state. */
