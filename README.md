@@ -53,14 +53,21 @@ Simulator-Nachrichten als `messagepacket` an das simx-Panel weiter; die
 Extension sendet ihre Anmeldung als
 
 ```
+IOT1:r:<leseumfang>
+IOT1:i:<seriennummer>
 IOT1:s:<serveradresse>
 IOT1:h:<slug oder token>
-IOT1:i:<seriennummer>
-IOT1:r:<leseumfang>
 ```
 
-Das Panel hört auf `h:` (welches Dashboard) und `s:` (welcher Server) und
-abonniert dann PocketBase. Mehr braucht es nicht.
+Das Panel hört auf `h:` (welches Dashboard), `s:` (welcher Server) und `r:`
+(wessen Werte) und fragt dann den Server. Mehr braucht es nicht.
+
+Es reagiert erst, wenn die Anmeldung vollständig ist, also mit der `h:`-Zeile,
+die immer als letzte kommt. Vorher stünde noch das Dashboard des VORIGEN
+Programms im Panel: Ein neu gestartetes Programm, das ein anderes Dashboard
+nennt, bekäme sonst für einen Moment die alten Werte geschickt. Nennt das
+Programm nach dem Neustart dasselbe Dashboard, schickt das Panel ihm Uhrzeit und
+aktuelle Werte noch einmal, wie der Campus es beim Gerät tut.
 
 Der Schalter „im Simulator senden" ist weg — er entfällt ersatzlos, weil der
 Grund für ihn weg ist. Er stand im Übertragungsblock, weil pxt die Ausgaben des

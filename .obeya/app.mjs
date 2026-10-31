@@ -226,10 +226,13 @@ function harness(panelUrl, server) {
   const frame = document.getElementById('panel');
   const log = document.getElementById('log');
   const board = document.getElementById('board');
+  // In the extension's order (iotcampus.hello) and a packet per line, as
+  // iotsim.out sends them: the reference comes last.
   const announce = () => {
-    const lines = ['IOT1:s:${server}', 'IOT1:h:' + board.value, 'IOT1:i:1', 'IOT1:r:' + scope];
-    frame.contentWindow.postMessage({ type: 'messagepacket', channel: 'iot',
-      data: new TextEncoder().encode(lines.join('\\n')) }, '*');
+    const lines = ['IOT1:r:' + scope, 'IOT1:i:1', 'IOT1:s:${server}', 'IOT1:h:' + board.value];
+    for (const line of lines)
+      frame.contentWindow.postMessage({ type: 'messagepacket', channel: 'iot',
+        data: new TextEncoder().encode(line) }, '*');
   };
   board.onchange = announce;
   document.getElementById('online').onchange = (e) =>
